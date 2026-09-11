@@ -347,6 +347,11 @@ export default {
   async fetch(request, env) {
     try {
       const pathname = new URL(request.url).pathname;
+      if (pathname === "/health" && request.method === "GET") {
+        if (!env.DB) return json({ok:false},503);
+        await env.DB.prepare("SELECT 1 AS ok").first();
+        return json({ok:true});
+      }
       if (pathname.startsWith("/api/")) return await handleApi(request,env,pathname);
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed",{status:405,headers:{allow:"GET, HEAD",...securityHeaders()}});
       if (pathname === "/FCG_Dashboard_Datenvorlage.xlsx") {
