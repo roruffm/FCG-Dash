@@ -1,4 +1,4 @@
-const CACHE_NAME = "fcg-dashboard-shell-v7";
+const CACHE_NAME = "fcg-dashboard-shell-v8";
 const APP_FILES = [
   "./",
   "./index.html",
