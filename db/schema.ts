@@ -12,3 +12,14 @@ export const loginAttempts = sqliteTable("login_attempts", {
   windowStarted: integer("window_started").notNull(),
   attempts: integer("attempts").notNull().default(0),
 });
+
+export const authPasswords = sqliteTable("auth_passwords", {
+  role: text("role").primaryKey(),
+  passwordHash: text("password_hash").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const passwordSyncEvents = sqliteTable("password_sync_events", {
+  jti: text("jti").primaryKey(),
+  expiresAt: integer("expires_at").notNull(),
+});

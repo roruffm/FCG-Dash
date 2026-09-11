@@ -4,7 +4,16 @@ const ROLES = ["general", "staff", "leadership"];
 const SESSION_SECONDS = 8 * 60 * 60;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
+const PASSWORD_MIN_LENGTH = 12;
+const GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com";
+const GITHUB_OIDC_JWKS = "https://token.actions.githubusercontent.com/.well-known/jwks";
+const GITHUB_OIDC_AUDIENCE = "fcg-dashboard-password-sync";
+const GITHUB_REPOSITORY = "roruffm/FCG-Dash";
+const GITHUB_REPOSITORY_ID = "1365119446";
+const GITHUB_OWNER_ID = "270083419";
+const GITHUB_WORKFLOW_REF = "roruffm/FCG-Dash/.github/workflows/update-dashboard-passwords.yml@refs/heads/main";
 const encoder = new TextEncoder();
+let githubJwksCache = { expiresAt: 0, keys: [] };
 
 const seedData = {
   "30": {
@@ -65,6 +74,52 @@ async function hmac(value, secret) {
   return new Uint8Array(await crypto.subtle.sign("HMAC",key,encoder.encode(value)));
 }
 
+function decodeJwtPart(value) {
+  return JSON.parse(new TextDecoder().decode(parseBase64Url(value)));
+}
+
+async function githubSigningKeys() {
+  if (githubJwksCache.expiresAt > Date.now() && githubJwksCache.keys.length) return githubJwksCache.keys;
+  const response = await fetch(GITHUB_OIDC_JWKS, { headers: { accept:"application/json" } });
+  if (!response.ok) throw new Error("GITHUB_JWKS_UNAVAILABLE");
+  const payload = await response.json();
+  if (!Array.isArray(payload.keys) || !payload.keys.length) throw new Error("GITHUB_JWKS_INVALID");
+  githubJwksCache = { expiresAt: Date.now() + 60 * 60 * 1000, keys: payload.keys };
+  return payload.keys;
+}
+
+async function verifyGitHubOidc(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) throw new Error("INVALID_GITHUB_TOKEN");
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const header = decodeJwtPart(encodedHeader);
+  const claims = decodeJwtPart(encodedPayload);
+  if (header.alg !== "RS256" || !header.kid) throw new Error("INVALID_GITHUB_TOKEN");
+  const jwk = (await githubSigningKeys()).find(candidate=>candidate.kid === header.kid && candidate.kty === "RSA");
+  if (!jwk) throw new Error("UNKNOWN_GITHUB_KEY");
+  const key = await crypto.subtle.importKey("jwk",jwk,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["verify"]);
+  const valid = await crypto.subtle.verify({name:"RSASSA-PKCS1-v1_5"},key,parseBase64Url(encodedSignature),encoder.encode(`${encodedHeader}.${encodedPayload}`));
+  if (!valid) throw new Error("INVALID_GITHUB_SIGNATURE");
+
+  const now = Math.floor(Date.now()/1000);
+  const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+  const trusted = claims.iss === GITHUB_OIDC_ISSUER
+    && audiences.includes(GITHUB_OIDC_AUDIENCE)
+    && Number(claims.nbf) <= now + 30
+    && Number(claims.exp) >= now - 30
+    && claims.repository === GITHUB_REPOSITORY
+    && String(claims.repository_id) === GITHUB_REPOSITORY_ID
+    && String(claims.repository_owner_id) === GITHUB_OWNER_ID
+    && claims.ref === "refs/heads/main"
+    && claims.environment === "production"
+    && claims.event_name === "workflow_dispatch"
+    && claims.workflow_ref === GITHUB_WORKFLOW_REF
+    && typeof claims.jti === "string"
+    && claims.jti.length >= 16;
+  if (!trusted) throw new Error("UNTRUSTED_GITHUB_WORKFLOW");
+  return claims;
+}
+
 async function makeSession(role, secret) {
   const payload = base64Url(encoder.encode(JSON.stringify({role,exp:Math.floor(Date.now()/1000)+SESSION_SECONDS})));
   return `${payload}.${base64Url(await hmac(payload,secret))}`;
@@ -116,6 +171,19 @@ async function recordFailure(db, limit) {
 }
 
 async function authenticatePassword(password, env) {
+  const configured = await env.DB.prepare("SELECT role, password_hash FROM auth_passwords WHERE role IN ('leadership', 'staff', 'general')").all();
+  if ((configured.results || []).length) {
+    if (!env.FCG_PASSWORD_PEPPER) throw new Error("PASSWORD_PEPPER_MISSING");
+    const supplied = await hmac(password,env.FCG_PASSWORD_PEPPER);
+    let role = null;
+    for (const candidate of configured.results || []) {
+      let digest;
+      try { digest=parseBase64Url(candidate.password_hash); } catch (_) { digest=new Uint8Array(); }
+      if (ROLES.includes(candidate.role) && constantTimeEqual(supplied,digest)) role=candidate.role;
+    }
+    return role;
+  }
+
   const supplied = await sha256(password);
   const candidates = [
     ["leadership",env.FCG_LEADERSHIP_PASSWORD],
@@ -128,6 +196,40 @@ async function authenticatePassword(password, env) {
     if (constantTimeEqual(supplied,digest) && secret) role = candidateRole;
   }
   return role;
+}
+
+async function syncPasswordsFromGitHub(request, env) {
+  if (!env.FCG_PASSWORD_PEPPER) return json({error:"Die Passwort-Synchronisierung ist noch nicht eingerichtet."},503);
+  const authorization = request.headers.get("authorization") || "";
+  if (!authorization.startsWith("Bearer ")) return json({error:"GitHub-Nachweis fehlt."},401);
+
+  let claims;
+  try { claims=await verifyGitHubOidc(authorization.slice(7)); }
+  catch (error) { console.error("github_oidc_rejected",error);return json({error:"GitHub-Workflow wurde nicht autorisiert."},403); }
+
+  const replay = await env.DB.prepare("SELECT jti FROM password_sync_events WHERE jti = ?").bind(claims.jti).first();
+  if (replay) return json({error:"Dieser GitHub-Nachweis wurde bereits verwendet."},409);
+
+  let body;
+  try { body=await readJson(request); } catch (_) { return json({error:"Die Passwortdaten konnten nicht gelesen werden."},400); }
+  const passwords = {
+    leadership: typeof body.leadership === "string" ? body.leadership : "",
+    staff: typeof body.staff === "string" ? body.staff : "",
+    general: typeof body.general === "string" ? body.general : ""
+  };
+  if (Object.values(passwords).some(password=>password.length < PASSWORD_MIN_LENGTH || password.length > 256)) return json({error:`Jedes Passwort muss ${PASSWORD_MIN_LENGTH} bis 256 Zeichen lang sein.`},400);
+  if (new Set(Object.values(passwords)).size !== ROLES.length) return json({error:"Für jeden Bereich muss ein anderes Passwort verwendet werden."},400);
+
+  const now = new Date().toISOString();
+  const statements = [];
+  for (const role of ROLES) {
+    const passwordHash = base64Url(await hmac(passwords[role],env.FCG_PASSWORD_PEPPER));
+    statements.push(env.DB.prepare("INSERT INTO auth_passwords (role, password_hash, updated_at) VALUES (?, ?, ?) ON CONFLICT(role) DO UPDATE SET password_hash = excluded.password_hash, updated_at = excluded.updated_at").bind(role,passwordHash,now));
+  }
+  statements.push(env.DB.prepare("INSERT INTO password_sync_events (jti, expires_at) VALUES (?, ?)").bind(claims.jti,Number(claims.exp)));
+  statements.push(env.DB.prepare("DELETE FROM password_sync_events WHERE expires_at < ?").bind(Math.floor(Date.now()/1000)-3600));
+  await env.DB.batch(statements);
+  return json({ok:true,updatedAt:now});
 }
 
 async function seedPeriod(db, period, overwrite = false) {
@@ -172,15 +274,18 @@ function sanitizeScope(scope, value) {
 
 async function handleApi(request, env, pathname) {
   if (!env.DB) return json({error:"Die gemeinsame Datenbank ist derzeit nicht verfügbar."},503);
+  if (pathname === "/api/admin/sync-passwords" && request.method === "POST") return syncPasswordsFromGitHub(request,env);
   if (["POST","PUT","PATCH","DELETE"].includes(request.method) && !requireOrigin(request)) return json({error:"Ungültige Anfrage."},403);
 
   if (pathname === "/api/login" && request.method === "POST") {
-    if (!env.FCG_SESSION_SECRET || !env.FCG_LEADERSHIP_PASSWORD || !env.FCG_STAFF_PASSWORD || !env.FCG_GENERAL_PASSWORD) return json({error:"Die Anmeldung ist noch nicht eingerichtet."},503);
+    if (!env.FCG_SESSION_SECRET) return json({error:"Die Anmeldung ist noch nicht eingerichtet."},503);
     const limit = await loginLimit(env.DB,request);
     if (limit.blocked) return json({error:"Zu viele Versuche. Bitte in 15 Minuten erneut probieren."},429,{"retry-after":"900"});
     let body; try { body=await readJson(request); } catch (_) { return json({error:"Ungültige Anfrage."},400); }
     const password = typeof body.password === "string" ? body.password.slice(0,256) : "";
-    const role = await authenticatePassword(password,env);
+    let role;
+    try { role=await authenticatePassword(password,env); }
+    catch (error) { console.error("password_auth_unavailable",error);return json({error:"Die Anmeldung ist vorübergehend nicht verfügbar."},503); }
     if (!role) { await recordFailure(env.DB,limit); return json({error:"Das Passwort ist nicht korrekt."},401); }
     await env.DB.prepare("DELETE FROM login_attempts WHERE key_hash = ?").bind(limit.keyHash).run();
     const token = await makeSession(role,env.FCG_SESSION_SECRET);
