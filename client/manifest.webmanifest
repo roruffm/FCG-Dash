@@ -1,0 +1,22 @@
+{
+  "name": "FCG Leitungsdashboard",
+  "short_name": "FCG Dashboard",
+  "description": "Geschütztes Dashboard für zusammengefasste Kennzahlen der FCG Frankfurt",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#006269",
+  "lang": "de-DE",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "fcg-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

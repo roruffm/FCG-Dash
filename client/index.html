@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Internes Leitungsdashboard der Freien Christengemeinde Frankfurt">
+  <meta name="theme-color" content="#006269">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="fcg-logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="fcg-logo.png">
+  <title>FCG Leitungsdashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
+    <div class="login-visual" aria-hidden="true">
+      <div class="site-wordmark"><img src="fcg-logo.png" alt=""><span>FREIE CHRISTENGEMEINDE<br>FRANKFURT</span></div>
+      <div class="login-statement"><span>KIRCHE IM</span><span>HERZEN DER</span><span>STADT</span></div>
+      <p>Gemeinde verstehen. Gemeinsam gut leiten.</p>
+    </div>
+    <div class="login-card">
+      <div class="login-brand"><img src="fcg-logo.png" alt="FCG"><span>Dashboard<small>Frankfurt</small></span></div>
+      <p class="eyebrow">Geschützter Zugang</p>
+      <h1 id="loginTitle">Willkommen zurück</h1>
+      <p class="login-copy">Bitte gib das Passwort für deinen Zugriffsbereich ein.</p>
+      <form id="loginForm">
+        <label class="login-field">Passwort
+          <span><input id="passwordInput" type="password" autocomplete="current-password" required><button id="togglePassword" type="button" aria-label="Passwort anzeigen">Anzeigen</button></span>
+        </label>
+        <p class="login-error" id="loginError" role="alert"></p>
+        <button class="primary-button login-submit" type="submit">Sicher anmelden</button>
+      </form>
+      <p class="login-note"><span aria-hidden="true">◆</span> Die Zugriffsrechte werden serverseitig geprüft. Es werden keine Passwörter auf diesem Gerät gespeichert.</p>
+    </div>
+  </section>
+
+  <div class="shell" id="appShell" hidden>
+    <aside class="sidebar" aria-label="Bereichsnavigation">
+      <a class="brand" href="#uebersicht" aria-label="FCG Leitungsdashboard Startseite">
+        <img class="brand-logo" src="fcg-logo.png" alt="FCG">
+        <span><strong>Dashboard</strong><small>Frankfurt</small></span>
+      </a>
+      <nav class="nav">
+        <a class="active" href="#uebersicht" data-dashboard-target="overview"><span aria-hidden="true">01</span> Gesamtüberblick</a>
+        <a href="#gottesdienste" data-dashboard-target="worship"><span aria-hidden="true">02</span> Gottesdienste</a>
+        <a href="#gemeinschaft" data-dashboard-target="community" data-role-min="leadership"><span aria-hidden="true">03</span> Gemeinschaft</a>
+        <a href="#mitarbeit" data-dashboard-target="teams" data-role-min="staff"><span aria-hidden="true">04</span> Mitarbeit</a>
+        <a href="#digital" data-dashboard-target="content"><span aria-hidden="true">05</span> Inhalte</a>
+      </nav>
+      <div class="sidebar-note">
+        <span class="privacy-icon" aria-hidden="true">◆</span>
+        <div><strong>Datenschutzmodus</strong><p>Nur zusammengefasste Kennzahlen. Keine Seelsorge- oder Gebetsdaten.</p></div>
+      </div>
+      <div class="sidebar-session">
+        <span class="role-dot" aria-hidden="true"></span>
+        <div><small>Angemeldet als</small><strong id="sidebarRole">–</strong></div>
+      </div>
+      <p class="sidebar-version">Geschützte App · Version 5.1</p>
+    </aside>
+
+    <main class="main" id="uebersicht">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow"><span id="roleEyebrow">Dashboard</span> · <span id="viewEyebrow">Gesamtüberblick</span></p>
+          <h1 id="dashboardTitle">Was bewegt die FCG?</h1>
+          <p class="subtitle" id="dashboardSubtitle"><span id="dashboardDescription">Die wichtigsten Entwicklungen im</span> <span id="periodLabel">laufenden Quartal</span>.</p>
+        </div>
+        <div class="top-session">
+          <span class="role-chip" id="topRole">–</span>
+          <button class="logout-button" id="logoutButton" type="button">Abmelden</button>
+        </div>
+      </header>
+
+      <section class="control-bar" aria-label="Dashboard steuern">
+        <div class="filter-actions">
+          <label class="select-wrap">Dashboard
+            <select id="dashboardSelect" aria-label="Art des Dashboards wählen"></select>
+          </label>
+          <label class="select-wrap">Zeitraum
+            <select id="periodSelect" aria-label="Berichtszeitraum wählen">
+              <option value="30">Letzte 30 Tage</option>
+              <option value="90" selected>Dieses Quartal</option>
+              <option value="365">Dieses Jahr</option>
+            </select>
+          </label>
+        </div>
+        <div class="top-actions">
+          <button class="install-button" id="installButton" type="button">App installieren</button>
+          <button class="primary-button" id="editButton" type="button">Zahlen bearbeiten</button>
+          <button class="secondary-button" id="importButton" type="button">Excel importieren</button>
+          <button class="secondary-button" id="printButton" type="button">Bericht drucken</button>
+          <input id="excelInput" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        </div>
+      </section>
+
+      <div class="demo-banner" role="status">
+        <span><strong>Geschützt:</strong> Du siehst nur die für deinen Bereich freigegebenen Daten.</span>
+        <span id="saveStatus">Gemeinsamen Datenstand laden …</span>
+        <a href="FCG_Dashboard_Datenvorlage.xlsx" download data-role-min="staff">Excel-Vorlage herunterladen</a>
+      </div>
+
+      <section class="kpi-grid" aria-label="Zentrale Kennzahlen">
+        <article class="kpi-card accent-purple" data-dashboard="worship">
+          <div class="kpi-head"><span>Gottesdienstbesuche</span><span class="kpi-symbol" aria-hidden="true">●</span></div>
+          <strong class="kpi-value" id="attendanceValue">3.842</strong>
+          <div class="kpi-foot"><span class="delta positive" id="attendanceDelta">+8,4 %</span><span>zum Vergleichszeitraum</span></div>
+          <div class="sparkline" id="attendanceSpark" aria-label="Besuchsentwicklung"></div>
+        </article>
+        <article class="kpi-card accent-teal" data-dashboard="community" data-role-min="leadership">
+          <div class="kpi-head"><span>Neue Kontakte</span><span class="kpi-symbol" aria-hidden="true">+</span></div>
+          <strong class="kpi-value" id="contactsValue">84</strong>
+          <div class="kpi-foot"><span class="delta positive" id="contactsDelta">+12,0 %</span><span>über New Here</span></div>
+          <div class="sparkline" id="contactsSpark" aria-label="Entwicklung neuer Kontakte"></div>
+        </article>
+        <article class="kpi-card accent-orange" data-dashboard="community" data-role-min="leadership">
+          <div class="kpi-head"><span>Connectgruppen aktiv</span><span class="kpi-symbol" aria-hidden="true">◎</span></div>
+          <strong class="kpi-value" id="groupsValue">31</strong>
+          <div class="kpi-foot"><span class="delta positive" id="groupsDelta">+2 Gruppen</span><span>seit Jahresbeginn</span></div>
+          <div class="sparkline" id="groupsSpark" aria-label="Entwicklung aktiver Connectgruppen"></div>
+        </article>
+        <article class="kpi-card accent-red" data-dashboard="teams" data-role-min="staff">
+          <div class="kpi-head"><span>Offene Dienste</span><span class="kpi-symbol" aria-hidden="true">!</span></div>
+          <strong class="kpi-value" id="servicesValue">18</strong>
+          <div class="kpi-foot"><span class="delta warning" id="servicesDelta">6 dringend</span><span>in den nächsten 14 Tagen</span></div>
+          <div class="sparkline" id="servicesSpark" aria-label="Entwicklung offener Dienste"></div>
+        </article>
+      </section>
+
+      <section class="briefing" aria-labelledby="briefingTitle" data-dashboard="overview" data-role-min="staff">
+        <div class="briefing-badge" aria-hidden="true">i</div>
+        <div class="briefing-content">
+          <p class="eyebrow light">Automatische Hinweise</p>
+          <h2 id="briefingTitle">Drei Dinge verdienen Aufmerksamkeit</h2>
+          <div class="insight-grid" id="insightGrid"></div>
+        </div>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="panel chart-panel" id="gottesdienste" data-dashboard="worship">
+          <div class="panel-head">
+            <div><p class="eyebrow">Reichweite</p><h2>Gottesdienste im Verlauf</h2></div>
+            <div class="chart-tools">
+              <label class="chart-type-control">Diagrammart
+                <select id="chartTypeSelect" aria-label="Diagrammart wählen">
+                  <option value="line">Linie</option>
+                  <option value="area">Fläche</option>
+                  <option value="bar">Balken</option>
+                </select>
+              </label>
+              <div class="legend" aria-label="Legende"><span><i class="dot purple"></i>Vor Ort</span><span><i class="dot teal"></i>Online</span></div>
+            </div>
+          </div>
+          <div class="chart-wrap"><svg id="lineChart" viewBox="0 0 740 280" role="img" aria-label="Diagramm zu Gottesdienstbesuchen vor Ort und online"></svg></div>
+          <div class="chart-summary"><strong id="avgAttendance">Ø 443</strong><span>Besuche vor Ort pro Sonntag</span><strong id="onlineShare">28 %</strong><span>zusätzliche Online-Reichweite</span></div>
+        </article>
+
+        <article class="panel journey-panel" id="gemeinschaft" data-dashboard="community" data-role-min="leadership">
+          <div class="panel-head">
+            <div><p class="eyebrow">Gemeinschaft</p><h2>Vom Besuch zum Mitmachen</h2></div>
+            <span class="info-tag">Integrationsweg</span>
+          </div>
+          <p class="panel-intro">Wie viele Menschen den nächsten Schritt gehen – ausschließlich als Gesamtzahlen.</p>
+          <div class="journey" id="journey"></div>
+          <div class="journey-callout"><strong id="journeyRate">35 %</strong><span>der neuen Kontakte fanden Anschluss an eine Connectgruppe.</span></div>
+        </article>
+
+        <article class="panel staffing-panel" id="mitarbeit" data-dashboard="teams" data-role-min="staff">
+          <div class="panel-head">
+            <div><p class="eyebrow">Mitarbeit</p><h2>Dienstteams</h2></div>
+            <button class="text-button" type="button" id="sortTeams">Nach Bedarf sortieren</button>
+          </div>
+          <div class="team-list" id="teamList"></div>
+        </article>
+
+        <article class="panel content-panel" id="digital" data-dashboard="content">
+          <div class="panel-head">
+            <div><p class="eyebrow">Digital</p><h2>Was Menschen beschäftigt</h2></div>
+            <span class="info-tag">Predigten & Impulse</span>
+          </div>
+          <div class="topic-list" id="topicList"></div>
+          <p class="content-note">Basis: anonymisierte Aufrufe, Favoriten und Suchbegriffe.</p>
+        </article>
+
+        <article class="panel events-panel" data-dashboard="teams" data-role-min="staff">
+          <div class="panel-head"><div><p class="eyebrow">Nächste Schritte</p><h2>Kurse & Veranstaltungen</h2></div></div>
+          <div class="event-table" role="table" aria-label="Kurse und Veranstaltungen">
+            <div class="table-row table-head" role="row"><span>Name</span><span>Anmeldungen</span><span>Status</span></div>
+            <div id="eventRows"></div>
+          </div>
+        </article>
+
+        <article class="panel data-panel" data-dashboard="overview" data-role-min="leadership">
+          <div class="panel-head"><div><p class="eyebrow">Datenverwaltung</p><h2>Gemeinsamer Datenstand</h2></div></div>
+          <p>Änderungen werden sicher gespeichert und stehen allen Berechtigten entsprechend ihrer Rolle zur Verfügung.</p>
+          <div class="data-actions">
+            <button class="secondary-button" id="backupButton" type="button">Sicherung herunterladen</button>
+            <button class="danger-button" id="resetButton" type="button">Beispieldaten wiederherstellen</button>
+          </div>
+        </article>
+      </section>
+
+      <footer>
+        <span>FCG Leitungsdashboard</span>
+        <span>„Erfülltes Leben mit Gott für alle“</span>
+        <span>Keine Bewertung einzelner Personen oder ihres Glaubens.</span>
+      </footer>
+    </main>
+  </div>
+
+  <dialog id="editDialog" class="edit-dialog">
+    <form id="editForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Manuelle Eingabe</p><h2>Zahlen bearbeiten</h2><p id="editPeriodNote"></p></div>
+        <button class="close-button" type="button" data-close-dialog aria-label="Dialog schließen">×</button>
+      </div>
+      <div class="editor-scroll">
+        <section class="editor-section" data-editor-scope="leadership">
+          <h3>Kennzahlen und Integrationsweg</h3>
+          <div class="input-grid" id="metricInputs"></div>
+        </section>
+        <section class="editor-section" data-editor-scope="leadership">
+          <div class="editor-title"><h3>Gottesdienste im Verlauf</h3><button type="button" class="text-button add-row" data-section="attendance">Zeile hinzufügen</button></div>
+          <div class="editable-table" id="attendanceEditor"></div>
+        </section>
+        <section class="editor-section" data-editor-scope="staff">
+          <div class="editor-title"><h3>Dienstteams</h3><button type="button" class="text-button add-row" data-section="teams">Zeile hinzufügen</button></div>
+          <div class="editable-table" id="teamsEditor"></div>
+        </section>
+        <section class="editor-section" data-editor-scope="leadership">
+          <div class="editor-title"><h3>Predigten und Impulse</h3><button type="button" class="text-button add-row" data-section="topics">Zeile hinzufügen</button></div>
+          <div class="editable-table" id="topicsEditor"></div>
+        </section>
+        <section class="editor-section" data-editor-scope="staff">
+          <div class="editor-title"><h3>Kurse und Veranstaltungen</h3><button type="button" class="text-button add-row" data-section="events">Zeile hinzufügen</button></div>
+          <div class="editable-table" id="eventsEditor"></div>
+        </section>
+      </div>
+      <div class="dialog-actions">
+        <button class="secondary-button" type="button" data-close-dialog>Abbrechen</button>
+        <button class="primary-button" type="submit">Änderungen speichern</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="resetDialog" class="confirm-dialog">
+    <form method="dialog">
+      <h2>Beispieldaten wiederherstellen?</h2>
+      <p>Alle gemeinsam gespeicherten Werte werden mit den Startwerten überschrieben.</p>
+      <div class="dialog-actions">
+        <button class="secondary-button" value="cancel">Abbrechen</button>
+        <button class="danger-button solid" id="confirmReset" value="confirm">Zurücksetzen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
